@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'auth_terminal.php';
 
 if ($_SESSION['terminal_type'] !== 'CUSTOMER') {

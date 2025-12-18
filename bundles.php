@@ -1,7 +1,7 @@
 <?php
 require_once 'config.php';
 if (empty($_SESSION['admin'])) {
-    header('Location: admin_login.php');
+    header('Location: bundles.php');
     exit;
 }
 
@@ -36,18 +36,6 @@ function handle_image_upload(string $fieldName): ?string
     }
 
     return 'uploads/' . $newName;
-}
-
-// Log helper for debugging bundle save failures
-function log_bundle_error(string $msg): void
-{
-    $uploadsDir = __DIR__ . '/uploads';
-    if (!is_dir($uploadsDir)) {
-        @mkdir($uploadsDir, 0777, true);
-    }
-    $file = $uploadsDir . '/bundle_error.log';
-    $entry = '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
-    @file_put_contents($file, $entry, FILE_APPEND | LOCK_EX);
 }
 
 // --- Handle POST actions (create/edit for category/product/bundle) ---
@@ -116,69 +104,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Create bundle (no category; standalone)
-    if ($action === 'create_bundle') {
-        $bundleName   = trim($_POST['bundle_name'] ?? '');
-        $bundleCode   = trim($_POST['bundle_code'] ?? '');
-        $selectedProd = $_POST['bundle_items'] ?? []; // array of product IDs
-        $quantities   = $_POST['bundle_qty'] ?? [];   // keyed by product ID
+    // Create bundle
+if ($action === 'create_bundle') {
+    $bundleName = trim($_POST['bundle_name'] ?? '');
+    $bundleCode = trim($_POST['bundle_code'] ?? '');
+    $selectedProd = $_POST['bundle_items'] ?? [];
+    $quantities = $_POST['bundle_qty'] ?? [];
 
-        if ($bundleName !== '' && $bundleCode !== '' && !empty($selectedProd)) {
-            $ids = array_map('intval', $selectedProd);
-            $in  = implode(',', $ids);
+    if ($bundleName !== '' && $bundleCode !== '' && !empty($selectedProd)) {
 
-            $stmt = $pdo->query("SELECT id, price FROM menu_items WHERE id IN ($in) AND is_bundle = 0");
-            $prices = [];
-            if ($stmt === false) {
-                log_bundle_error('SELECT prices query failed: ' . implode(' | ', $pdo->errorInfo()));
-            } else {
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $prices[$row['id']] = (float)$row['price'];
-                }
-            }
+        // Fetch product prices
+        $ids = array_map('intval', $selectedProd);
+        $in = implode(',', $ids);
+        $stmt = $pdo->query("SELECT id, price FROM menu_items WHERE id IN ($in) AND is_bundle = 0");
 
-            $total = 0;
-            $bundleComponents = [];
-            foreach ($ids as $pid) {
-                $qty = max(1, (int)($quantities[$pid] ?? 1));
-                if (!isset($prices[$pid])) continue;
-                $total += $prices[$pid] * $qty;
-                $bundleComponents[] = ['id' => $pid, 'qty' => $qty];
-            }
+        $prices = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $prices[$row['id']] = (float)$row['price'];
+        }
 
-            if ($total > 0 && !empty($bundleComponents)) {
-                $imagePath = handle_image_upload('bundle_image');
+        // Build bundle components + compute total
+        $total = 0;
+        $bundleComponents = [];
 
-                $stmt = $pdo->prepare(
-                    "INSERT INTO menu_items (code, category_id, is_bundle, name, price, image_path, is_active)
-                     VALUES (?, NULL, 1, ?, ?, ?, 1)"
-                );
-                if ($stmt === false) {
-                    log_bundle_error('Prepare insert bundle failed: ' . implode(' | ', $pdo->errorInfo()));
-                } else {
-                    $ok = $stmt->execute([$bundleCode, $bundleName, $total, $imagePath]);
-                    if ($ok === false) {
-                        log_bundle_error('Insert bundle execute failed: ' . implode(' | ', $stmt->errorInfo()));
-                    }
-                    $bundleMenuId = (int)$pdo->lastInsertId();
+        foreach ($ids as $pid) {
+            $qty = max(1, (int)($quantities[$pid] ?? 1));
+            if (!isset($prices[$pid])) continue;
 
-                    $stmtItem = $pdo->prepare(
-                        "INSERT INTO bundle_items (bundle_id, bundle_menu_item_id, menu_item_id, quantity)
-                         VALUES (?, ?, ?, ?)"
-                    );
-                    if ($stmtItem === false) {
-                        log_bundle_error('Prepare insert bundle_items failed: ' . implode(' | ', $pdo->errorInfo()));
-                    } else {
-                        foreach ($bundleComponents as $comp) {
-                            $ok2 = $stmtItem->execute([$bundleMenuId, $bundleMenuId, $comp['id'], $comp['qty']]);
-                            if ($ok2 === false) {
-                                log_bundle_error('Insert bundle_items execute failed for menu_item_id=' . $comp['id'] . ': ' . implode(' | ', $stmtItem->errorInfo()));
-                            }
-                        }
-                    }
-                }
+            $total += $prices[$pid] * $qty;
+            $bundleComponents[] = ['id' => $pid, 'qty' => $qty];
+        }
+
+        if ($total > 0) {
+
+            // Upload image
+            $imagePath = handle_image_upload('bundle_image');
+
+            // Insert bundle into menu_items
+            $stmtBundle = $pdo->prepare(
+                "INSERT INTO menu_items (code, category_id, is_bundle, name, price, image_path, is_active)
+                 VALUES (?, NULL, 1, ?, ?, ?, 1)"
+            );
+            $stmtBundle->execute([$bundleCode, $bundleName, $total, $imagePath]);
+
+            // Get bundle ID
+            $bundleMenuId = $pdo->lastInsertId();
+
+            // Insert bundle components
+            $stmtItem = $pdo->prepare(
+                "INSERT INTO bundle_items (bundle_id, menu_item_id, quantity)
+                VALUES (?, ?, ?)"
+
+            );
+
+            foreach ($bundleComponents as $comp) {
+                $stmtItem->execute([$bundleMenuId, $comp['id'], $comp['qty']]);
             }
         }
     }
+}
+
 
     // Edit bundle (including composition)
     if ($action === 'edit_bundle') {
@@ -195,12 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->query("SELECT id, price FROM menu_items WHERE id IN ($in) AND is_bundle = 0");
             $prices = [];
-            if ($stmt === false) {
-                log_bundle_error('SELECT prices query failed (edit): ' . implode(' | ', $pdo->errorInfo()));
-            } else {
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $prices[$row['id']] = (float)$row['price'];
-                }
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $prices[$row['id']] = (float)$row['price'];
             }
 
             $total = 0;
@@ -224,46 +205,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      SET code = ?, name = ?, price = ?, image_path = ?
                      WHERE id = ? AND is_bundle = 1"
                 );
-                if ($stmt === false) {
-                    log_bundle_error('Prepare update bundle failed: ' . implode(' | ', $pdo->errorInfo()));
-                } else {
-                    $ok = $stmt->execute([$bundleCode, $bundleName, $total, $imagePath, $bundleId]);
-                    if ($ok === false) {
-                        log_bundle_error('Update bundle execute failed: ' . implode(' | ', $stmt->errorInfo()));
-                    }
-                }
+                $stmt->execute([$bundleCode, $bundleName, $total, $imagePath, $bundleId]);
 
                 // Replace bundle items
-                $stmtDel = $pdo->prepare("DELETE FROM bundle_items WHERE bundle_menu_item_id = ?");
-                if ($stmtDel === false) {
-                    log_bundle_error('Prepare delete bundle_items failed: ' . implode(' | ', $pdo->errorInfo()));
-                } else {
-                    $okDel = $stmtDel->execute([$bundleId]);
-                    if ($okDel === false) {
-                        log_bundle_error('Delete bundle_items execute failed: ' . implode(' | ', $stmtDel->errorInfo()));
-                    }
-                }
+                $stmtDel = $pdo->prepare("DELETE FROM bundle_items WHERE bundle_id = ?");
+                $stmtDel->execute([$bundleId]);
 
                 $stmtItem = $pdo->prepare(
-                    "INSERT INTO bundle_items (bundle_id, bundle_menu_item_id, menu_item_id, quantity)
-                     VALUES (?, ?, ?, ?)"
+                    "INSERT INTO bundle_items (bundle_id, menu_item_id, quantity)
+                    VALUES (?, ?, ?)"
                 );
-                if ($stmtItem === false) {
-                    log_bundle_error('Prepare insert bundle_items (edit) failed: ' . implode(' | ', $pdo->errorInfo()));
-                } else {
-                    foreach ($bundleComponents as $comp) {
-                        $ok2 = $stmtItem->execute([$bundleId, $bundleId, $comp['id'], $comp['qty']]);
-                        if ($ok2 === false) {
-                            log_bundle_error('Insert bundle_items (edit) execute failed for menu_item_id=' . $comp['id'] . ': ' . implode(' | ', $stmtItem->errorInfo()));
-                        }
-                    }
+
+                foreach ($bundleComponents as $comp) {
+                    $stmtItem->execute([$bundleId, $comp['id'], $comp['qty']]);
                 }
             }
         }
     }
 
     // After any POST, redirect to avoid form resubmission
-    header('Location: admin_products.php');
+    header('Location: bundles.php');
     exit;
 }
 
@@ -286,14 +247,15 @@ $bundles        = array_values(array_filter($products, fn($p) => (int)$p['is_bun
 // Bundle details for "View" modal and Edit prefill
 $bundleItemsByBundle = [];
 $stmtDetails = $pdo->query(
-    "SELECT bi.bundle_menu_item_id, bi.menu_item_id, bi.quantity,
+    "SELECT bi.bundle_id, bi.menu_item_id, bi.quantity,
             m.name, m.price
      FROM bundle_items bi
      JOIN menu_items m ON m.id = bi.menu_item_id
-     ORDER BY bi.bundle_menu_item_id, m.name"
+     ORDER BY bi.bundle_id, m.name"
 );
+
 while ($row = $stmtDetails->fetch(PDO::FETCH_ASSOC)) {
-    $bid = (int)$row['bundle_menu_item_id'];
+    $bid = (int)$row['bundle_id'];
     $mid = (int)$row['menu_item_id'];
     $qty = (int)$row['quantity'];
     $price = (float)$row['price'];
@@ -326,9 +288,61 @@ $stats = [
 			z-index: 2;
 			background-color: #f8f9fa; /* same as .table-light */
 		}
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 240px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: #343a40;
+            padding-top: 60px;
+            color: white;
+            overflow-y: auto;
+        }
+        .sidebar a {
+            display: block;
+            padding: 10px 18px;
+            color: #ddd;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .sidebar a:hover {
+            background: #495057;
+            color: #fff;
+        }
+        
+        /* Push content to the right when sidebar exists */
+        .content {
+            margin-left: 240px;
+            padding: 15px;
+        }
+
+        .table-center {
+            display: flex;
+            justify-content: center;
+        }
+
+        .table-small-text th, .table-small-text td {
+            font-size: 1rem !important; 
+        }
+        .table td, .table th {
+            padding: 10px 14px !important; 
+        }
+
 	</style>
 </head>
 <body class="bg-light" style="font-size:0.875rem;">
+<div class="sidebar">
+    <h2 class="text-center mb-3">Admin Panel</h2>
+    <a href="insights_&_statistics.php">Insights & Statistics</a>
+    <a href="products.php">Products</a>
+    <a href="categories.php">Categories</a>
+    <a href="bundles.php">Bundles</a>
+</div>
+
+<div class="content">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3">
     <div class="container-fluid">
         <span class="navbar-brand">Products Management</span>
@@ -337,151 +351,12 @@ $stats = [
 </nav>
 
 <div class="container mb-1">
-
-    <!-- ROW 1: Insights + Products -->
-    <div class="row g-3 mb-4">
-        <!-- Insights / Stats col-4 -->
-        <div class="col-md-4">
-            <div class="card shadow-sm" style="max-height:380px;">
-                <div class="card-header bg-secondary text-white py-1">
-                    <strong style="font-size:0.9rem;">Insights & Statistics</strong>
-                </div>
-                <div class="card-body py-2 small" style="max-height:250px; overflow-y:auto;">
-                    <ul class="list-group list-group-flush mb-3">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Categories
-                            <span class="badge bg-primary rounded-pill"><?= (int)$stats['categories'] ?></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Products
-                            <span class="badge bg-success rounded-pill"><?= (int)$stats['products'] ?></span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Bundles
-                            <span class="badge bg-warning text-dark rounded-pill"><?= (int)$stats['bundles'] ?></span>
-                        </li>
-                    </ul>
-                    <div class="text-muted">
-                        <small>
-                            These stats update automatically as you add or edit categories, products, and bundles.
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Products col-8 -->
-        <div class="col-md-8">
-            <div class="card shadow-sm" style="max-height:380px;">
-                <div class="card-header bg-warning py-1 d-flex justify-content-between align-items-center">
-                    <strong style="font-size:0.9rem;">Products</strong>
-                    <button type="button" class="btn btn-sm btn-danger py-0"
-                            onclick="openProductModal('create')">
-                        + Add Product
-                    </button>
-                </div>
-                <div class="card-body p-0" style="max-height:250px; overflow-y:auto;">
-                    <table class="table table-sm mb-0 align-middle table-sticky-header">
-                            <thead class="table-light small">
-                            <tr>
-                                <th style="width:60px;">ID</th>
-                                <th style="width:50px;">Img</th>
-                                <th>Name</th>
-                                <th>Code</th>
-                                <th>Category</th>
-                                <th class="text-end">Price</th>
-                                <th style="width:80px;" class="text-end">Actions</th>
-                            </tr>
-                            </thead>
-                            <tbody class="small">
-                            <?php foreach ($singleProducts as $p): ?>
-                                <tr>
-                                    <td><?= (int)$p['id'] ?></td>
-                                    <td>
-                                        <?php if (!empty($p['image_path'])): ?>
-                                            <img src="<?= htmlspecialchars($p['image_path'] ?? '') ?>" alt=""
-                                                 style="width:38px;height:38px;object-fit:cover;border-radius:4px;cursor:pointer;"
-                                                 onclick="openImageView('<?= htmlspecialchars($p['image_path'] ?? '', ENT_QUOTES) ?>')">
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?= htmlspecialchars($p['name'] ?? '') ?></td>
-                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($p['code'] ?? '') ?></span></td>
-                                    <td><?= htmlspecialchars($p['category_name'] ?? '') ?></td>
-                                    <td class="text-end">₱<?= number_format((float)$p['price'], 2) ?></td>
-                                    <td class="text-end">
-                                        <button type="button" class="btn btn-sm btn-outline-primary"
-                                                onclick="openProductModal('edit',
-                                                    <?= (int)$p['id'] ?>,
-                                                    '<?= htmlspecialchars($p['name'] ?? '', ENT_QUOTES) ?>',
-                                                    '<?= htmlspecialchars($p['code'] ?? '', ENT_QUOTES) ?>',
-                                                    '<?= htmlspecialchars((string)($p['price'] ?? ''), ENT_QUOTES) ?>',
-                                                    <?= (int)($p['category_id'] ?? 0) ?>,
-                                                    '<?= htmlspecialchars($p['image_path'] ?? '', ENT_QUOTES) ?>'
-                                                )">
-                                            Edit
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            <?php if (!$singleProducts): ?>
-                                <tr><td colspan="7" class="text-center text-muted py-3">No products yet.</td></tr>
-                            <?php endif; ?>
-                            </tbody>
-                        </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- ROW 2: Categories + Bundles -->
     <div class="row g-3">
-        <!-- Categories col-4 -->
-        <div class="col-md-4">
-            <div class="card shadow-sm" style="max-height:380px;">
-                <div class="card-header bg-info py-1 d-flex justify-content-between align-items-center">
-                    <strong style="font-size:0.9rem;">Categories</strong>
-                    <button type="button" class="btn btn-sm btn-primary py-0"
-                            onclick="openCategoryModal('create')">
-                        + Add Category
-                    </button>
-                </div>
-                <div class="card-body p-0" style="max-height:200px; overflow-y:auto;">
-                    <table class="table table-sm mb-0 align-middle table-sticky-header">
-                        <thead class="table-light small">
-                        <tr>
-                            <th style="width:60px;">ID</th>
-                            <th>Name</th>
-                            <th style="width:80px;" class="text-end">Actions</th>
-                        </tr>
-                        </thead>
-                        <tbody class="small">
-                        <?php foreach ($categories as $c): ?>
-                            <tr>
-                                <td><?= (int)$c['id'] ?></td>
-                                <td><?= htmlspecialchars($c['name'] ?? '') ?></td>
-                                <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-outline-primary"
-                                            onclick="openCategoryModal('edit',
-                                                <?= (int)$c['id'] ?>,
-                                                '<?= htmlspecialchars($c['name'] ?? '', ENT_QUOTES) ?>'
-                                            )">
-                                        Edit
-                                    </button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php if (!$categories): ?>
-                            <tr><td colspan="3" class="text-center text-muted py-3">No categories yet.</td></tr>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
         <!-- Bundles col-8 -->
-        <div class="col-md-8">
-            <div class="card shadow-sm" style="max-height:380px;">
+        <div class="table-center">
+            <div class="col-md-12">
+            <div class="card shadow-sm" style="max-height:500px;">
                 <div class="card-header bg-success text-white py-1 d-flex justify-content-between align-items-center">
                     <strong style="font-size:0.9rem;">Bundles</strong>
                     <button type="button" class="btn btn-sm btn-light text-success py-0"
@@ -489,14 +364,14 @@ $stats = [
                         + Add Bundle
                     </button>
                 </div>
-                <div class="card-body p-0" style="max-height:200px; overflow-y:auto;">
+                <div class="card-body p-0" style="max-height:350px; overflow-y:auto;">
                     <table class="table table-sm mb-0 align-middle table-sticky-header">
                             <thead class="table-light small">
                             <tr>
-                                <th style="width:60px;">ID</th>
-                                <th style="width:50px;">Img</th>
-                                <th>Name</th>
-                                <th>Code</th>
+                                <th style="width:80px;">ID</th>
+                                <th style="width:70px;">Img</th>
+                                <th style="width:200px;">Name</th>
+                                <th style="width:150px;">Code</th>
                                 <th class="text-end">Price</th>
                                 <th style="width:160px;" class="text-end">Actions</th>
                             </tr>
@@ -544,6 +419,7 @@ $stats = [
                         </table>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 
@@ -1001,5 +877,6 @@ function openBundleViewModal(id, name, code, total) {
     bundleViewModal.show();
 }
 </script>
+</div>
 </body>
 </html>

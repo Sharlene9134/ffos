@@ -235,7 +235,7 @@ $menuItems = $prodStmt->fetchAll(PDO::FETCH_ASSOC);
                         <strong>Order Items</strong>
                     </div>
                     <div class="card-body p-0">
-                        <div class="table-scroll-small2" style="">
+                        <div class="table-scroll-small2">
                             <table class="table table-sm align-middle" id="orderItemsTable">
                                 <thead class="table-light">
                                 <tr>

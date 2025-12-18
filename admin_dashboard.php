@@ -1,7 +1,7 @@
 <?php
 require_once 'config.php';
 if (empty($_SESSION['admin'])) {
-    header('Location: admin_login.php');
+    header("Location: " . $_SERVER['HTTP_REFERER']);
     exit;
 }
 ?>
@@ -28,7 +28,10 @@ if (empty($_SESSION['admin'])) {
 					<a href="admin_terminals.php" class="text-decoration-none">Terminal Management</a>
 				</li>
 				<li class="list-group-item">
-					<a href="admin_products.php" class="text-decoration-none">Products Management</a>
+					<a href="insights_&_statistics.php" class="text-decoration-none">Products Management</a>
+				</li>
+                <li class="list-group-item">
+					<a href="sales_report.php" class="text-decoration-none">Sales Report</a>
 				</li>
 			</ul>
 

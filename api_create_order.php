@@ -1,5 +1,6 @@
 <?php
 // api_create_order.php
+session_start();
 require_once 'config.php';
 $customerTerminalId = $_SESSION['terminal_id'] ?? null;
 
