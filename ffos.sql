@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 01, 2025 at 09:58 AM
+-- Generation Time: Dec 18, 2025 at 09:31 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -45,12 +45,36 @@ CREATE TABLE `bundles` (
 CREATE TABLE `bundle_items` (
   `id` int(11) NOT NULL,
   `bundle_id` int(11) NOT NULL,
-  `bundle_menu_item_id` int(11) NOT NULL,
   `menu_item_id` int(11) NOT NULL,
   `quantity` int(11) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `bundle_items`
+--
+
+INSERT INTO `bundle_items` (`id`, `bundle_id`, `menu_item_id`, `quantity`, `created_at`, `updated_at`) VALUES
+(8, 51, 1, 1, '2025-12-18 06:36:22', '2025-12-18 06:36:22'),
+(12, 48, 1, 2, '2025-12-18 07:40:44', '2025-12-18 07:40:44'),
+(13, 48, 4, 4, '2025-12-18 07:40:44', '2025-12-18 07:40:44'),
+(14, 48, 3, 4, '2025-12-18 07:40:44', '2025-12-18 07:40:44'),
+(15, 48, 30, 4, '2025-12-18 07:40:44', '2025-12-18 07:40:44'),
+(16, 48, 41, 1, '2025-12-18 07:40:44', '2025-12-18 07:40:44'),
+(17, 50, 1, 1, '2025-12-18 07:41:41', '2025-12-18 07:41:41'),
+(18, 50, 4, 1, '2025-12-18 07:41:41', '2025-12-18 07:41:41'),
+(19, 50, 3, 1, '2025-12-18 07:41:41', '2025-12-18 07:41:41'),
+(20, 52, 3, 1, '2025-12-18 07:42:48', '2025-12-18 07:42:48'),
+(21, 52, 39, 1, '2025-12-18 07:42:48', '2025-12-18 07:42:48'),
+(22, 52, 32, 1, '2025-12-18 07:42:48', '2025-12-18 07:42:48'),
+(23, 7, 2, 1, '2025-12-18 07:44:10', '2025-12-18 07:44:10'),
+(24, 7, 40, 1, '2025-12-18 07:44:10', '2025-12-18 07:44:10'),
+(25, 7, 38, 1, '2025-12-18 07:44:10', '2025-12-18 07:44:10'),
+(26, 7, 35, 1, '2025-12-18 07:44:10', '2025-12-18 07:44:10'),
+(27, 43, 30, 3, '2025-12-18 07:45:11', '2025-12-18 07:45:11'),
+(28, 43, 36, 3, '2025-12-18 07:45:11', '2025-12-18 07:45:11'),
+(29, 43, 32, 3, '2025-12-18 07:45:11', '2025-12-18 07:45:11');
 
 -- --------------------------------------------------------
 
@@ -80,11 +104,11 @@ INSERT INTO `menu_items` (`id`, `code`, `category_id`, `is_bundle`, `name`, `pri
 (4, 'COKEL', NULL, 0, 'Large Coke', 45.00, NULL, 0),
 (5, 'wfwqfwq', 1, 0, 'safasf', 51581.00, 'uploads/prod_692cfa68962f31.90440074.jpg', 0),
 (6, 'dsada', NULL, 1, 'jkanbjksak', 815.00, NULL, 0),
-(7, 'sada', NULL, 1, 'dasd', 51881.00, NULL, 0),
+(7, 'ComMeal', NULL, 1, 'Combo Meal', 269.00, '', 0),
 (8, 'ww', 1, 0, 'sda', 242.00, NULL, 0),
 (9, 'llp', NULL, 1, 'wet', 105.00, NULL, 0),
 (10, 'tew', NULL, 1, 'tew', 340.00, NULL, 0),
-(11, 'hhh', NULL, 1, 'n', 45.00, NULL, 0),
+(11, 'hhh', NULL, 1, 'n', 45.00, '', 0),
 (12, 'wwrt', 2, 0, 'efawefg', 325325.00, NULL, 0),
 (27, 'BRG001', 1, 0, 'Classic Cheeseburger', 79.00, 'images/burger1.jpg', 1),
 (28, 'BRG002', 1, 0, 'Beef BBQ Burger', 99.00, 'images/burger2.jpg', 1),
@@ -100,7 +124,15 @@ INSERT INTO `menu_items` (`id`, `code`, `category_id`, `is_bundle`, `name`, `pri
 (38, 'DST001', 5, 0, 'Vanilla Sundae', 45.00, 'images/sundae1.jpg', 1),
 (39, 'DST002', 5, 0, 'Choco Sundae', 55.00, 'images/sundae2.jpg', 1),
 (40, 'DST003', 5, 0, 'Apple Pie', 49.00, 'images/pie1.jpg', 1),
-(41, 'CHKNGTS', 2, 0, 'Chicken Nuggets', 100.00, NULL, 1);
+(41, 'CHKNGTS', 2, 0, 'Chicken Nuggets', 100.00, NULL, 1),
+(42, 'DRK004', 4, 0, 'Large Sprite', 25.00, NULL, 1),
+(43, 'FM2', NULL, 1, 'Family Meal', 474.00, '', 1),
+(45, 'fknfkd c', NULL, 1, 'sfcszxc', 45.00, NULL, 1),
+(47, 'xzhcghasd', NULL, 1, 'sdasd', 195.00, NULL, 1),
+(48, 'FM1', NULL, 1, 'Family Meal', 1176.00, '', 1),
+(50, 'SM1', NULL, 1, 'Solo Meal', 255.00, '', 1),
+(51, 'rhcvnv', NULL, 1, 'rgcx', 150.00, NULL, 1),
+(52, 'snack meal', NULL, 1, 'Snack Meal', 154.00, '', 1);
 
 -- --------------------------------------------------------
 
@@ -489,7 +521,7 @@ ALTER TABLE `bundles`
 ALTER TABLE `bundle_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_bundle_items_bundle` (`bundle_id`),
-  ADD KEY `fk_bundle_items_menu_item` (`bundle_menu_item_id`);
+  ADD KEY `fk_bundle_items_item` (`menu_item_id`);
 
 --
 -- Indexes for table `menu_items`
@@ -541,13 +573,13 @@ ALTER TABLE `bundles`
 -- AUTO_INCREMENT for table `bundle_items`
 --
 ALTER TABLE `bundle_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `menu_items`
 --
 ALTER TABLE `menu_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=53;
 
 --
 -- AUTO_INCREMENT for table `orders`
@@ -581,8 +613,8 @@ ALTER TABLE `terminals`
 -- Constraints for table `bundle_items`
 --
 ALTER TABLE `bundle_items`
-  ADD CONSTRAINT `fk_bundle_items_bundle` FOREIGN KEY (`bundle_id`) REFERENCES `bundles` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `fk_bundle_items_menu_item` FOREIGN KEY (`bundle_menu_item_id`) REFERENCES `menu_items` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `fk_bundle_items_bundle` FOREIGN KEY (`bundle_id`) REFERENCES `menu_items` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_bundle_items_item` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `menu_items`
